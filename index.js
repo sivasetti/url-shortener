@@ -8,7 +8,7 @@ app.use(express.json());
 
 app.get('/health', (req, res)=>{
     res.json({
-        status : 'ok'
+        status : 'ok',
     });
 });
 
@@ -45,8 +45,9 @@ app.post('/api/shorten', async (req, res) => {
     });
 });
 
+
 app.get('/:code', async (req, res) => {
-    const code = req.params;
+    const {code} = req.params;
 
     const result = await pool.query(
         `SELECT long_url FROM urls WHERE short_code = $1`, [code]
@@ -60,9 +61,30 @@ app.get('/:code', async (req, res) => {
         `UPDATE urls SET click_count = click_count + 1 WHERE short_code = $1`, [code]
     );
 
-
-    res.redirect(302, result.rows[0].longUrl);
+    res.redirect(302, result.rows[0].long_url);
 });     
+
+app.get('/api/urls/:code/stats', async (req, res) => {
+    const {code} = req.params;
+
+    const result = await pool.query(
+        'SELECT short_code, long_url, created_at, click_count FROM urls WHERE short_code = $1', [code]
+    );
+
+    if (result.rows.length === 0){
+        return res.status(404).json({
+            error : "Short url not found"
+        });
+    }
+
+    const row = result.rows[0];
+    res.json({
+        shortCode : row.short_code,
+        longUrl : row.long_url, 
+        createdAt : row.created_at,
+        totalClicks : Number(row.click_count),
+    });
+})
 
 
 app.listen(3000, ()=>{
