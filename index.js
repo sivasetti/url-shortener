@@ -4,6 +4,8 @@ const app = express();
 const pool = require('./db');
 const {encode} = require('./base62');
 
+const ratelimit = require('./ratelimit');
+
 app.use(express.json());
 
 app.get('/health', (req, res)=>{
@@ -13,7 +15,7 @@ app.get('/health', (req, res)=>{
 });
 
 
-app.post('/api/shorten', async (req, res) => {
+app.post('/api/shorten', ratelimit,  async (req, res) => {
     const {longUrl} = req.body;
     let parsed;
     try{
