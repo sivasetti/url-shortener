@@ -15,6 +15,19 @@ app.get('/health', (req, res)=>{
 
 app.post('/api/shorten', async (req, res) => {
     const {longUrl} = req.body;
+    let parsed;
+    try{
+        parsed = new URL(longUrl);
+    }
+    catch{
+        return res.status(400).json({
+            error : 'Please send a valid URL'
+        });
+    }
+
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:'){
+        return res.status(400).json({error : "Only http and https URLs are allowed"});
+    }
     
     const result = await pool.query(
         `INSERT INTO urls (long_url) VALUES ($1) RETURNING id`,
