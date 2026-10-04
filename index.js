@@ -74,22 +74,23 @@ app.get('/api/urls/:code/stats', async (req, res) => {
     const {code} = req.params;
 
     const result = await pool.query(
-        'SELECT short_code, long_url, created_at, click_count FROM urls WHERE short_code = $1', [code]
+        'SELECT short_code, long_url, create_at, click_count FROM urls WHERE short_code = $1', [code]
     );
-
-    const byDay = await pool.query(
-        `SELECT DATE(clicked_at) AS day, COUNT(*) AS CLICKS
-        FROM clicks
-        WHERE short_code = $1
-        GROUP BY day,
-        ORDER BY day`,[code]
-    );
-
+    
     if (result.rows.length === 0){
         return res.status(404).json({
             error : "Short url not found"
         });
     }
+
+    const byDay = await pool.query(
+        `SELECT DATE(clicked_at) AS day, COUNT(*) AS CLICKS
+        FROM clicks
+        WHERE short_code = $1
+        GROUP BY day
+        ORDER BY day`,[code]
+    );
+
 
     const row = result.rows[0];
     res.json({

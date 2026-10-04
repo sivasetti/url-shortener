@@ -7,12 +7,13 @@ async function setup() {
         id BIGSERIAL PRIMARY KEY,
         short_code VARCHAR(10) UNIQUE,
         long_url TEXT NOT NULL,
-        create_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         click_count BIGINT NOT NULL DEFAULT 0
         )
         `);
         console.log(`Table "urls" is ready`);
-
+    
+    
 
     await pool.query(`
         CREATE TABLE IF NOT EXISTS clicks(
