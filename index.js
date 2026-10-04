@@ -6,6 +6,8 @@ const {encode} = require('./base62');
 
 const ratelimit = require('./ratelimit');
 
+const clickQueue = require('./clickQueue');
+
 app.use(express.json());
 
 app.get('/health', (req, res)=>{
@@ -59,10 +61,12 @@ app.get('/:code', async (req, res) => {
         return res.status(404).json({error : 'Short url not found'});
     }
 
-    await pool.query(
-        `UPDATE urls SET click_count = click_count + 1 WHERE short_code = $1`, [code]
-    );
+    // await pool.query(
+    //     `UPDATE urls SET click_count = click_count + 1 WHERE short_code = $1`, [code]
+    // );
 
+    await clickQueue.add('click', {code});
+    
     res.redirect(302, result.rows[0].long_url);
 });     
 
