@@ -12,8 +12,6 @@ async function setup() {
         )
         `);
         console.log(`Table "urls" is ready`);
-    
-    
 
     await pool.query(`
         CREATE TABLE IF NOT EXISTS clicks(
