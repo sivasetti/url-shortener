@@ -76,7 +76,7 @@ app.get('/api/urls/:code/stats', async (req, res) => {
     const result = await pool.query(
         'SELECT short_code, long_url, create_at, click_count FROM urls WHERE short_code = $1', [code]
     );
-    
+
     if (result.rows.length === 0){
         return res.status(404).json({
             error : "Short url not found"
