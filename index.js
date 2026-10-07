@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 
 const pool = require('./db');
-const {encode} = require('./base62');
+const {encode} = require('./src/lib/base62');
 
 const ratelimit = require('./ratelimit');
 
