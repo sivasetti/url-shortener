@@ -1,5 +1,5 @@
 const {Worker} = require('bullmq');
-const pool = require('./db');
+const pool = require('./src/lib/db');
 const { Connection } = require('pg');
 
 const worker = new Worker('clicks', async (job) => {

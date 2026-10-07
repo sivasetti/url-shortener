@@ -1,4 +1,4 @@
-const redis = require('./redis');
+const redis = require('./src/lib/redis');
 
 const CAPACITY = 5; // MAX REQUESTS/BUCKET SIZE
 const REFILL_PER_SECOND = 5/60; // ...PER THIS MANY SECONDS/ 100 TOKENS PER MINUTE, DRIPPING SLOWLY
