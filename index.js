@@ -4,9 +4,9 @@ const app = express();
 const pool = require('./src/lib/db');
 const {encode} = require('./src/lib/base62');
 
-const ratelimit = require('./ratelimit');
+const ratelimit = require('./src/middleware/ratelimit');
 
-const clickQueue = require('./clickQueue');
+const clickQueue = require('./src/queues/clickQueue');
 
 app.use(express.json());
 
