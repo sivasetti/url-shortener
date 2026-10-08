@@ -1,12 +1,12 @@
 const express = require('express');
 const app = express();
 
-const pool = require('./src/lib/db');
+const pool = require('./lib/db');
 
-const clickQueue = require('./src/queues/clickQueue');
+const clickQueue = require('./queues/clickQueue');
 
-const urlsRouter = require('./src/routes/urls');
-const redirectRouter = require('./src/routes/redirect');
+const urlsRouter = require('./routes/urls');
+const redirectRouter = require('./routes/redirect');
 
 app.use(express.json());
 
