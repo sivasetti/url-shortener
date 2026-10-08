@@ -1,5 +1,5 @@
-const pool = require('./db');
-const {encode} = require('./src/lib/base62');
+const pool = require('../src/lib/db');
+const {encode} = require('../src/lib/base62');
 
 async function seed() {
     const TOTAL = 100000;

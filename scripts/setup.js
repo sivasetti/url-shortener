@@ -1,4 +1,4 @@
-const pool = require('./src/lib/db');
+const pool = require('../src/lib/db');
 
 
 async function setup() {
