@@ -10,6 +10,10 @@ router.get('/:code', async (req, res) => {
 
     const url = await urlRepository.findByShortCode(code);
 
+    if (!url){
+        return res.status(404).json({error : `Short url not found`});
+    }
+
     await clickQueue.add('click', {code});
 
     res.redirect(302, url.long_url);
