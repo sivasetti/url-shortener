@@ -26,6 +26,17 @@ async function setShortCode(id, shortCode) {
 }
 
 
+async function findStatsByShortCode(code) {
+    const result = await pool.query(
+        `SELECT short_code, long_url, click_count, created_at
+        FROM urls
+        WHERE short_code = $1
+        `,[code]
+    );
+
+    return result.rows[0] || null;
+}
+
 module.exports = {
     findByShortCode,
     createUrl,

@@ -1,8 +1,8 @@
 const express = require('express');
-const pool = require('../lib/db');
 const {encode} = require('../lib/base62')
 const ratelimit = require('../middleware/ratelimit');
 const urlRepository = require('../repositories/urlRepository');
+const clickRepository = require('../repositories/clickRepository')
 
 
 const router = express.Router();
@@ -41,32 +41,24 @@ router.post('/api/shorten', ratelimit,  async (req, res) => {
 router.get('/api/urls/:code/stats', async (req, res) => {
     const {code} = req.params;
 
-    const result = await pool.query(
-        'SELECT short_code, long_url, create_at, click_count FROM urls WHERE short_code = $1', [code]
-    );
+    const stats = await urlRepository.findByShortCode(code);
 
-    if (result.rows.length === 0){
+    if (!stats){
         return res.status(404).json({
             error : "Short url not found"
         });
     }
 
-    const byDay = await pool.query(
-        `SELECT DATE(clicked_at) AS day, COUNT(*) AS CLICKS
-        FROM clicks
-        WHERE short_code = $1
-        GROUP BY day
-        ORDER BY day`,[code]
-    );
+    const byDay = await clickRepository.findClicksByDay(code);
 
 
-    const row = result.rows[0];
+    // const row = result.rows[0];
     res.json({
-        shortCode : row.short_code,
-        longUrl : row.long_url, 
-        createdAt : row.created_at,
-        totalClicks : Number(row.click_count),
-        clicksByDay : byDay.rows.map(r => ({ day : r.day, clicks : Number(r.clicks)})),
+        shortCode : byDay.short_code,
+        longUrl : byDay.long_url, 
+        createdAt : byDay.created_at,
+        totalClicks : Number(byDay.click_count),
+        clicksByDay : byDay.map(row => ({ day : row.day, clicks : Number(row.clicks)})),
     });
 });
 
