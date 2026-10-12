@@ -2,6 +2,7 @@ const express = require('express');
 const pool = require('../lib/db');
 const {encode} = require('../lib/base62')
 const ratelimit = require('../middleware/ratelimit');
+const urlRepository = require('../repositories/urlRepository');
 
 
 const router = express.Router();
@@ -22,15 +23,12 @@ router.post('/api/shorten', ratelimit,  async (req, res) => {
         return res.status(400).json({error : "Only http and https URLs are allowed"});
     }
     
-    const result = await pool.query(
-        `INSERT INTO urls (long_url) VALUES ($1) RETURNING id`,
-        [longUrl]
-    );
+    const created = await urlRepository.createUrl(longUrl);
 
-    const id = Number(result.rows[0].id);
-    const code = encode(id);
+    // const id = Number(result.rows[0].id);
+    const code = encode(created.id);
     
-    await pool.query(`UPDATE urls SET short_code = $1 WHERE id = $2`, [code, id]);
+    await urlRepository.setShortCode(created.id, code);
 
     res.status(201).json({
         shortCode : code,
