@@ -1,8 +1,9 @@
 const express = require('express');
-const {encode} = require('../lib/base62')
 const ratelimit = require('../middleware/ratelimit');
-const urlRepository = require('../repositories/urlRepository');
-const clickRepository = require('../repositories/clickRepository')
+const urlRepository = require('../repositories/urlRepository'); 
+const clickRepository = require('../repositories/clickRepository');
+const urlService = require('../services/urlService');
+
 
 
 const router = express.Router();
@@ -23,13 +24,9 @@ router.post('/api/shorten', ratelimit,  async (req, res) => {
         return res.status(400).json({error : "Only http and https URLs are allowed"});
     }
     
-    const created = await urlRepository.createUrl(longUrl);
+    const code = await urlService.shortenUrl(longUrl);
 
-    // const id = Number(result.rows[0].id);
-    const code = encode(created.id);
     
-    await urlRepository.setShortCode(created.id, code);
-
     res.status(201).json({
         shortCode : code,
         shortUrl : `http://localhost:3000/${code}`,
