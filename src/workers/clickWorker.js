@@ -1,16 +1,14 @@
 const {Worker} = require('bullmq');
 const pool = require('../lib/db');
 const { Connection } = require('pg');
+const urlRepository = require('../repositories/urlRepository');
+const clickRepository = require('../repositories/clickRepository');
 
 const worker = new Worker('clicks', async (job) => {
     const {code} = job.data;
-    await pool.query(
-        `UPDATE urls SET click_count = click_count + 1 WHERE short_code = $1`, [code]
-    );
 
-    await pool.query(`
-        INSERT INTO clicks (short_code) VALUES ($1)
-        `, [code]);
+    await urlRepository.incrementClickCount(code);
+    await clickRepository.recordClick(code);
         
     console.log('Counted a click for', code);
 }, 

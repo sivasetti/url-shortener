@@ -12,7 +12,13 @@ async function findClicksByDay(code) {
     return result.rows;
 }
 
+async function recordClick(code) {
+    await pool.query(
+        `INSERT INTO clicks (short_code) VALUES ($1)`, [code]);
+}
+
     
 module.exports = {
-    findClicksByDay
+    findClicksByDay,
+    recordClick
 }
