@@ -1,5 +1,4 @@
 const {Worker} = require('bullmq');
-const pool = require('../lib/db');
 const { Connection } = require('pg');
 const urlRepository = require('../repositories/urlRepository');
 const clickRepository = require('../repositories/clickRepository');
