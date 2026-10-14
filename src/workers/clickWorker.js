@@ -1,14 +1,12 @@
 const {Worker} = require('bullmq');
 const { Connection } = require('pg');
-const urlRepository = require('../repositories/urlRepository');
-const clickRepository = require('../repositories/clickRepository');
+const clickService = require('../services/clickService');
 
 const worker = new Worker('clicks', async (job) => {
     const {code} = job.data;
 
-    await urlRepository.incrementClickCount(code);
-    await clickRepository.recordClick(code);
-        
+    await clickService.recordClick(code);
+
     console.log('Counted a click for', code);
 }, 
 {
