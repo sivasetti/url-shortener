@@ -48,5 +48,6 @@ module.exports = {
     findByShortCode,
     createUrl,
     setShortCode,
-    incrementClickCount
+    incrementClickCount,
+    findStatsByShortCode,
 };

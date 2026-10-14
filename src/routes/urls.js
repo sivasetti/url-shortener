@@ -1,7 +1,5 @@
 const express = require('express');
 const ratelimit = require('../middleware/ratelimit');
-const urlRepository = require('../repositories/urlRepository'); 
-const clickRepository = require('../repositories/clickRepository');
 const urlService = require('../services/urlService');
 
 
@@ -38,24 +36,15 @@ router.post('/api/shorten', ratelimit,  async (req, res) => {
 router.get('/api/urls/:code/stats', async (req, res) => {
     const {code} = req.params;
 
-    const stats = await urlRepository.findByShortCode(code);
-
-    if (!stats){
-        return res.status(404).json({
-            error : "Short url not found"
-        });
-    }
-
-    const byDay = await clickRepository.findClicksByDay(code);
+    const result = await urlService.getUrlStats(code);
 
 
-    // const row = result.rows[0];
     res.json({
-        shortCode : byDay.short_code,
-        longUrl : byDay.long_url, 
-        createdAt : byDay.created_at,
-        totalClicks : Number(byDay.click_count),
-        clicksByDay : byDay.map(row => ({ day : row.day, clicks : Number(row.clicks)})),
+        shortCode : result.stats.short_code,
+        longUrl : result.stats.long_url, 
+        createdAt : result.stats.created_at,
+        totalClicks : Number(result.stats.click_count),
+        clicksByDay : result.clicksByDay,
     });
 });
 
