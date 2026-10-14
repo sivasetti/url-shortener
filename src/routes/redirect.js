@@ -1,6 +1,5 @@
 const express = require('express');
-const urlRepository = require('../repositories/urlRepository');
-const clickQueue = require('../queues/clickQueue');
+const urlService = require('../services/urlService');
 
 const router = express.Router();
 
@@ -8,15 +7,13 @@ const router = express.Router();
 router.get('/:code', async (req, res) => {
     const {code} = req.params;
 
-    const url = await urlRepository.findByShortCode(code);
+    const longUrl = await urlService.resolveUrl(code);
 
-    if (!url){
+    if (!longUrl){
         return res.status(404).json({error : `Short url not found`});
     }
 
-    await clickQueue.add('click', {code});
-
-    res.redirect(302, url.long_url);
+    res.redirect(302, longUrl);
 });  
 
 
