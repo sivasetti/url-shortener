@@ -1,4 +1,3 @@
-const { isPgPool } = require('bullmq');
 const pool = require('../lib/db');
 
 async function findByShortCode(code) {
