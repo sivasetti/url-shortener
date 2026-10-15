@@ -38,7 +38,9 @@ router.get('/api/urls/:code/stats', async (req, res) => {
 
     const result = await urlService.getUrlStats(code);
 
-
+    if (!result){
+        return res.status(404).json({error : "Short url not found"});
+    }
     res.json({
         shortCode : result.stats.short_code,
         longUrl : result.stats.long_url, 
