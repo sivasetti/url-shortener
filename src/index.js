@@ -1,8 +1,6 @@
 const express = require('express');
 const app = express();
 
-const clickQueue = require('./queues/clickQueue');
-
 const urlsRouter = require('./routes/urls');
 const redirectRouter = require('./routes/redirect');
 

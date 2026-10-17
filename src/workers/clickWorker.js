@@ -1,5 +1,4 @@
 const {Worker} = require('bullmq');
-const { Connection } = require('pg');
 const clickService = require('../services/clickService');
 
 const worker = new Worker('clicks', async (job) => {
