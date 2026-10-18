@@ -27,6 +27,7 @@ down a redirect.
 | Rate limiting | Token bucket in Redis, via Lua | Fixed windows allow a 2× burst at the boundary (100 at :59 + 100 at :00). A token bucket refills smoothly. The check-and-decrement runs as one Lua script inside Redis, so it is **atomic** — no race between concurrent requests. |
 | Click writes | BullMQ queue + separate worker | The redirect path only enqueues a job (a sub-millisecond Redis write). A worker persists clicks to PostgreSQL asynchronously, so analytics load never adds latency to redirects — and clicks are buffered, not lost, if the worker is down. |
 | Analytics storage | Raw click events + a counter | Every click is a row (`clicks` table), so stats can be sliced by day, referrer, anything. The `click_count` column gives O(1) totals. Raw events can be re-aggregated; a lone counter cannot be un-aggregated. |
+| Code structure | Layered monolith (routes → services → repositories) | HTTP, business logic, and SQL each live in exactly one layer, so every change — and every bug — has exactly one home. Dependencies point down only; no layer reaches around the one below it. |
 
 ## Architecture
 
@@ -72,10 +73,10 @@ Prerequisites: Node 20+, Docker Desktop (engine running).
 ```bash
 docker compose up -d        # PostgreSQL 16 + Redis 7
 npm install
-node setup.js               # create tables (idempotent)
-node index.js               # API on :3000        (terminal 1)
-node worker.js              # click worker        (terminal 2)
-node seed.js                # optional: insert 100,000 test links
+npm run setup               # create tables (idempotent)
+npm start                   # API on :3000        (terminal 1)
+npm run worker              # click worker        (terminal 2)
+npm run seed                # optional: insert 100,000 test links
 ```
 
 ## Benchmarks
@@ -106,18 +107,39 @@ Reproduce: `k6 run k6/redirect-load.js` (thresholds: `p(95)<50`, checks for
 ## Project structure
 
 ```
-index.js        Express app: routes, validation, error surface
-db.js           PostgreSQL connection pool (single shared instance)
-redis.js        Redis client (single shared instance)
-base62.js       Base62 encode/decode for short codes
-ratelimit.js    Token-bucket middleware (Redis + Lua)
-clickQueue.js   BullMQ queue definition ('clicks')
-worker.js       BullMQ worker: persists click events + counter
-setup.js        Idempotent schema setup
-seed.js         Batched 100k-row seeder (with sequence re-sync)
-docker-compose.yml  PostgreSQL + Redis services
-k6/             Load-test scripts
+src/
+  index.js                  Entry point — builds the app, mounts the routes
+  routes/
+    urls.js                 POST /api/shorten · GET /api/urls/:code/stats
+    redirect.js             GET /:code
+  services/
+    urlService.js           shortenUrl · getUrlStats · resolveUrl
+    clickService.js         recordClick (counter increment + raw event)
+  repositories/
+    urlRepository.js        All SQL for the urls table
+    clickRepository.js      All SQL for the clicks table
+  middleware/
+    ratelimit.js            Token-bucket rate limiter (Redis + Lua)
+  queues/
+    clickQueue.js           BullMQ queue definition ('clicks')
+  workers/
+    clickWorker.js          Consumes click jobs, calls clickService
+  lib/
+    db.js                   PostgreSQL connection pool (single shared instance)
+    redis.js                Redis client (single shared instance)
+    base62.js               Base62 encode/decode for short codes
+db/
+  schema.sql                Table definitions
+scripts/
+  setup.js                  Creates the tables from db/schema.sql (idempotent)
+  seed.js                   Batched 100k-row seeder (with sequence re-sync)
+docker-compose.yml          PostgreSQL + Redis services
+k6/                         Load-test scripts
 ```
+
+Layers call down only: routes → services → repositories → infrastructure
+(`lib`, `queues`). Routes never contain SQL; services never see `req`/`res`;
+repositories return plain data (or `null` — the route decides the `404`).
 
 ## Roadmap
 
