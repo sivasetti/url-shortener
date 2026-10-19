@@ -15,7 +15,7 @@ app.get('/health', (req, res)=>{
 app.use(urlsRouter);
 app.use(redirectRouter);
 
-
-app.listen(3000, ()=>{
-    console.log(`Server runnning on 3000`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, ()=>{
+    console.log(`Server runnning on ${PORT}`);
 });
