@@ -27,7 +27,7 @@ router.post('/api/shorten', ratelimit,  async (req, res) => {
     
     res.status(201).json({
         shortCode : code,
-        shortUrl : `http://localhost:3000/${code}`,
+        shortUrl : `${process.env.BASE_URL || 'http://localhost:3000'}/${code}`,
     });
 });
 
