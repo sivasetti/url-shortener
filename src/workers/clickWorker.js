@@ -13,7 +13,13 @@ const worker = new Worker('clicks', async (job) => {
     console.log('Counted a click for', code);
 }, 
 {
-    connection : { host : redisUrl.hostname, port : Number(redisUrl.port)},
+    connection : {
+        host : redisUrl.hostname, 
+        port : Number(redisUrl.port),
+        username : redisUrl.username || undefined,
+        password : redisUrl.password || undefined,
+        tls : redisUrl.protocol === 'rediss:' ? {} : undefined
+    },
 });
 
 console.log('Click worker running - waiting for notes...');
