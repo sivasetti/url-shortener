@@ -6,6 +6,16 @@ const redirectRouter = require('./routes/redirect');
 
 app.use(express.json());
 
+app.get('/', (req, res)=>{
+    res.json({
+        name : `URL Shortener API`,
+        status : `ok`,
+        health : `GET /health`,
+        shorten : `POST /api/shorten`,
+        stats : `GET /api/urls/:code/stats`
+    });
+});
+
 app.get('/health', (req, res)=>{
     res.json({
         status : 'ok',
