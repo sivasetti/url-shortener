@@ -6,7 +6,7 @@ down a redirect.
 
 **Stack:** Node.js · Express · PostgreSQL · Redis · BullMQ · Docker · k6
 
-**Live:** https://url-shortener-71jf.onrender.com
+**Live:** https://url-shortener-71jf.onrender.com/api/shorten/
 
 ---
 
