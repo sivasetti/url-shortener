@@ -9,4 +9,3 @@ scrape_configs:
     - names: ['api']
       type: 'A'
       port: 3000
-    
