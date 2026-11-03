@@ -47,6 +47,15 @@ services:
     depends_on:
       - api
 
+  grafana:
+    image: grafana/grafana:11.3.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - prometheus
+      
   worker:
     build: .
     command: node src/workers/clickWorker.js
