@@ -66,4 +66,4 @@ services:
       - postgres
       - redis
 volumes : 
-  pgdata :
+  pgdata:
