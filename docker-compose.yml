@@ -69,3 +69,5 @@ services:
       - redis
 volumes : 
   pgdata :
+  grafana_data:
+  
