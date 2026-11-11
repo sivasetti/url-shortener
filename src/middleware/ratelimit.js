@@ -38,7 +38,10 @@ const TOKEN_BUCKET_SCRIPT = `
 async function ratelimit(req, res, next) {
     const key = `tb:${req.ip}`;
 
-    const allowed = await redis.eval(
+    let allowed;
+
+    try{ 
+        allowed = await redis.eval(
         TOKEN_BUCKET_SCRIPT,
         1,
         key,
@@ -46,6 +49,11 @@ async function ratelimit(req, res, next) {
         REFILL_PER_SECOND,
         Date.now()
     );
+    }
+    catch(err){
+        console.error(`Rate limiter: Redis Unavailable, allowing request -`, err.message);
+        return next();
+    }
 
     if (allowed === 0){
         return res.status(429).json({
