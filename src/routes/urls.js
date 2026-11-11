@@ -21,6 +21,17 @@ router.post('/api/shorten', ratelimit,  async (req, res) => {
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:'){
         return res.status(400).json({error : "Only http and https URLs are allowed"});
     }
+
+    const ownHosts = new Set([req.get('host')]);
+    if(process.env.BASE_URL){
+        ownHosts.add(new URL(process.env.BASE_URL).host);
+    }
+
+    if(ownHosts.has(parsed.host)){
+        return res.status(400).json({
+            error : "Shortening a URL from this service is not allowed"
+        })
+    }
     
     const code = await urlService.shortenUrl(longUrl);
 
