@@ -2,7 +2,7 @@ const {encode} = require('../lib/base62');
 const urlRepository = require('../repositories/urlRepository');
 const clickRepository = require('../repositories/clickRepository');
 const clickQueue = require('../queues/clickQueue');
-
+const redis = require('../lib/redis');
 
 async function shortenUrl(longUrl) {
     const created = await urlRepository.createUrl(longUrl);
@@ -32,10 +32,29 @@ async function getUrlStats(code) {
 
 
 async function resolveUrl(code) {
+    const cacheKey = `url:${code}`;
+    try{
+        const cached = await redis.get(cacheKey);
+        if(cached){
+            await clickQueue.add('click', {code});
+            return cached;
+        }
+    }
+    catch(err){
+        console.error(`Cache: Redis unavailable, Using database - `, err.message);
+    }
+
     const url = await urlRepository.findByShortCode(code);
 
-    if (!url){
+    if(!url){
         return null;
+    }
+
+    try{
+        await redis.set(cacheKey, url.long_url, 'EX', 3600);
+    }
+    catch(err){
+        console.error(`Cache: could not save url, continuing - `, err.message);
     }
 
     await clickQueue.add('click', {code});
