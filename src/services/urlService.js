@@ -35,7 +35,7 @@ async function resolveUrl(code) {
     const cacheKey = `url:${code}`;
     try{
         const cached = await redis.get(cacheKey);
-        if(!cached){
+        if(cached){
             await clickQueue.add('click', {code});
             return cached;
         }
