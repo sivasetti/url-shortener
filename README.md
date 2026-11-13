@@ -4,7 +4,7 @@ A URL shortener API built for correctness under load: collision-free short codes
 per-client rate limiting that can't be raced, and click analytics that never slow
 down a redirect.
 
-**Stack:** Node.js · Express · PostgreSQL · Redis · BullMQ · Docker · k6
+**Stack:** Node.js · Express · PostgreSQL · Redis · BullMQ · NGINX · Prometheus · Grafana · Docker · k6
 
 **Live:** https://url-shortener-71jf.onrender.com
 
@@ -13,12 +13,44 @@ down a redirect.
 ## What it does
 
 - **Shorten** — `POST` a long URL, get a short code (e.g. `https://sho.rt/d0s`)
-- **Redirect** — visiting a short link issues a fast `302` to the original URL
+- **Redirect** — visiting a short link issues a fast `302` to the original URL; hot links are served from a Redis cache (cache-aside, 1-hour TTL), so repeat clicks skip the database
 - **Analytics** — every click is recorded as a raw event; per-link totals and
   per-day breakdowns are available from a stats endpoint
-- **Rate limiting** — 100 requests/minute per client, enforced by a Redis
+- **Rate limiting** — 100 requests/minute per client, enforced by a Redis If Redis is unreachable the limiter **fails open** (requests are allowed, the skip is logged) — a limiter outage degrades protection instead of taking shortening down; the NGINX gateway adds a coarse 10 req/sec limit in front.
   **token bucket** executed as an atomic **Lua script**, so concurrent requests
   cannot slip past the limit
+- **Self-protection** — the service refuses to shorten its own URLs (`400`), so short links can never form a redirect loop
+- **Observability** — every replica exposes Prometheus metrics at `/metrics` (request counts + latency histogram); Prometheus scrapes all replicas, and Grafana renders request-rate and p95-latency dashboards
+| Redirect reads | Redis cache-aside in front of PostgreSQL | Redirects are ~100:1 read-heavy, and links are immutable (no edit/delete), so cached entries cannot go stale — the 1-hour TTL is pure insurance. On a Redis outage the path falls back to PostgreSQL: the cache accelerates, it never gates. |
+
+   client
+     │
+     ▼
+┌───────────────┐  limit_req 10 r/s   ┌─────────────────────────────┐
+│ NGINX gateway │ ───────────────────► │  API × 3 replicas (Express) │
+│    :8080      │                      │  routes → services → repos  │
+└───────────────┘                      └──┬───────────────┬──────────┘
+                                          │               │
+                        cache-aside       │               │ Lua token
+                        + click jobs      ▼               ▼ bucket
+                                    ┌──────────┐    ┌────────────┐
+                                    │  Redis   │    │ PostgreSQL │
+                                    └────┬─────┘    └──────▲─────┘
+                                         │ click jobs      │ writes
+                                         ▼                 │
+                                    ┌──────────────────────┐
+                                    │        worker        │
+                                    └──────────────────────┘
+
+   Prometheus scrapes GET /metrics on every API replica (DNS service
+   discovery) → Grafana dashboards: request rate + p95 latency.
+
+| `GET` | `/metrics` | Prometheus metrics (request totals + latency histogram, per replica) |
+
+nginx.conf                  Gateway: reverse proxy + limit_req in front of the API replicas
+prometheus.yml              Scrape config (all API replicas via DNS discovery)
+
+
 
 ## Why it's built this way
 
@@ -71,6 +103,11 @@ clicks (id BIGSERIAL PK, short_code VARCHAR(10), clicked_at TIMESTAMPTZ,
 ## Run it
 
 Prerequisites: Node 20+, Docker Desktop (engine running).
+Prerequisites: Docker Desktop (engine running).
+
+```bash
+docker compose up -d --build --scale api=3   # full stack, behind the gateway
+
 
 ```bash
 docker compose up -d        # PostgreSQL 16 + Redis 7
