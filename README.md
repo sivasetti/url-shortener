@@ -16,13 +16,30 @@ down a redirect.
 - **Redirect** — visiting a short link issues a fast `302` to the original URL; hot links are served from a Redis cache (cache-aside, 1-hour TTL), so repeat clicks skip the database
 - **Analytics** — every click is recorded as a raw event; per-link totals and
   per-day breakdowns are available from a stats endpoint
-- **Rate limiting** — 100 requests/minute per client, enforced by a Redis If Redis is unreachable the limiter **fails open** (requests are allowed, the skip is logged) — a limiter outage degrades protection instead of taking shortening down; the NGINX gateway adds a coarse 10 req/sec limit in front.
+- **Rate limiting** — 100 requests/minute per client, enforced by a Redis
   **token bucket** executed as an atomic **Lua script**, so concurrent requests
-  cannot slip past the limit
+  cannot slip past the limit. If Redis is unreachable the limiter **fails open**
+  (requests are allowed, the skip is logged) — a limiter outage degrades
+  protection instead of taking shortening down; the NGINX gateway adds a
+  coarse 10 req/sec limit in front.
 - **Self-protection** — the service refuses to shorten its own URLs (`400`), so short links can never form a redirect loop
 - **Observability** — every replica exposes Prometheus metrics at `/metrics` (request counts + latency histogram); Prometheus scrapes all replicas, and Grafana renders request-rate and p95-latency dashboards
-| Redirect reads | Redis cache-aside in front of PostgreSQL | Redirects are ~100:1 read-heavy, and links are immutable (no edit/delete), so cached entries cannot go stale — the 1-hour TTL is pure insurance. On a Redis outage the path falls back to PostgreSQL: the cache accelerates, it never gates. |
 
+## Why it's built this way
+
+| Decision | Choice | Why |
+|---|---|---|
+| Short codes | Base62 of the row ID | IDs never repeat, so codes are collision-free *by construction* — no retry loops, no random collisions. Trade-off: codes are enumerable (accepted, documented). |
+| Redirect status | `302`, not `301` | Browsers cache `301`s permanently and stop asking the server — which would silently kill click analytics. `302` keeps every click observable. |
+| Rate limiting | Token bucket in Redis, via Lua | Fixed windows allow a 2× burst at the boundary (100 at :59 + 100 at :00). A token bucket refills smoothly. The check-and-decrement runs as one Lua script inside Redis, so it is **atomic** — no race between concurrent requests. |
+| Click writes | BullMQ queue + separate worker | The redirect path only enqueues a job (a sub-millisecond Redis write). A worker persists clicks to PostgreSQL asynchronously, so analytics load never adds latency to redirects — and clicks are buffered, not lost, if the worker is down. |
+| Redirect reads | Redis cache-aside in front of PostgreSQL | Redirects are ~100:1 read-heavy, and links are immutable (no edit/delete), so cached entries cannot go stale — the 1-hour TTL is pure insurance. On a Redis outage the path falls back to PostgreSQL: the cache accelerates, it never gates. |
+| Analytics storage | Raw click events + a counter | Every click is a row (`clicks` table), so stats can be sliced by day, referrer, anything. The `click_count` column gives O(1) totals. Raw events can be re-aggregated; a lone counter cannot be un-aggregated. |
+| Code structure | Layered monolith (routes → services → repositories) | HTTP, business logic, and SQL each live in exactly one layer, so every change — and every bug — has exactly one home. Dependencies point down only; no layer reaches around the one below it. |
+
+## Architecture
+
+```
    client
      │
      ▼
@@ -44,38 +61,6 @@ down a redirect.
 
    Prometheus scrapes GET /metrics on every API replica (DNS service
    discovery) → Grafana dashboards: request rate + p95 latency.
-
-| `GET` | `/metrics` | Prometheus metrics (request totals + latency histogram, per replica) |
-
-nginx.conf                  Gateway: reverse proxy + limit_req in front of the API replicas
-prometheus.yml              Scrape config (all API replicas via DNS discovery)
-
-
-
-## Why it's built this way
-
-| Decision | Choice | Why |
-|---|---|---|
-| Short codes | Base62 of the row ID | IDs never repeat, so codes are collision-free *by construction* — no retry loops, no random collisions. Trade-off: codes are enumerable (accepted, documented). |
-| Redirect status | `302`, not `301` | Browsers cache `301`s permanently and stop asking the server — which would silently kill click analytics. `302` keeps every click observable. |
-| Rate limiting | Token bucket in Redis, via Lua | Fixed windows allow a 2× burst at the boundary (100 at :59 + 100 at :00). A token bucket refills smoothly. The check-and-decrement runs as one Lua script inside Redis, so it is **atomic** — no race between concurrent requests. |
-| Click writes | BullMQ queue + separate worker | The redirect path only enqueues a job (a sub-millisecond Redis write). A worker persists clicks to PostgreSQL asynchronously, so analytics load never adds latency to redirects — and clicks are buffered, not lost, if the worker is down. |
-| Analytics storage | Raw click events + a counter | Every click is a row (`clicks` table), so stats can be sliced by day, referrer, anything. The `click_count` column gives O(1) totals. Raw events can be re-aggregated; a lone counter cannot be un-aggregated. |
-| Code structure | Layered monolith (routes → services → repositories) | HTTP, business logic, and SQL each live in exactly one layer, so every change — and every bug — has exactly one home. Dependencies point down only; no layer reaches around the one below it. |
-
-## Architecture
-
-```
-                ┌────────────┐   Lua token bucket    ┌─────────┐
-   POST /api/shorten ────────►  rate limiter  ├────►│  Redis  │
-                └────────────┘                     └────┬────┘
-                                                      │ click jobs (BullMQ)
-   GET /:code ──► SELECT long_url (indexed)           ▼
-        │         from PostgreSQL               ┌──────────┐   INSERT click,
-        └── 302 ──► visitor                     │  worker  │   UPDATE counter
-                                                └──────────┘        │
-   GET /api/urls/:code/stats ──► totals + per-day aggregates  ◄─────┘
-                                                            PostgreSQL
 ```
 
 ## API
@@ -83,9 +68,10 @@ prometheus.yml              Scrape config (all API replicas via DNS discovery)
 | Method | Endpoint | Description |
 |---|---|---|
 | `GET` | `/health` | Liveness + DB check |
-| `POST` | `/api/shorten` | Body: `{ "longUrl": "https://…" }` → `201 { shortCode, shortUrl }`. Rate-limited (100/min per IP). `400` on invalid or non-http(s) URLs. |
+| `POST` | `/api/shorten` | Body: `{ "longUrl": "https://…" }` → `201 { shortCode, shortUrl }`. Rate-limited (100/min per IP). `400` on invalid, non-http(s), or this service's own URLs. |
 | `GET` | `/:code` | `302` redirect to the long URL; enqueues a click event. `404` for unknown codes. |
 | `GET` | `/api/urls/:code/stats` | `{ shortCode, longUrl, createdAt, totalClicks, clicksByDay[] }` |
+| `GET` | `/metrics` | Prometheus metrics (request totals + latency histogram, per replica) |
 
 All SQL is parameterized (`$1` placeholders) — no string interpolation of user
 input anywhere, so SQL injection is structurally impossible.
@@ -102,15 +88,20 @@ clicks (id BIGSERIAL PK, short_code VARCHAR(10), clicked_at TIMESTAMPTZ,
 
 ## Run it
 
-Prerequisites: Node 20+, Docker Desktop (engine running).
 Prerequisites: Docker Desktop (engine running).
 
 ```bash
 docker compose up -d --build --scale api=3   # full stack, behind the gateway
+```
 
+- App (via gateway): http://localhost:8080
+- Grafana: http://localhost:3000 (admin / admin)
+- Prometheus: http://localhost:9090
+
+For app development without Docker, run only the data services in Compose:
 
 ```bash
-docker compose up -d        # PostgreSQL 16 + Redis 7
+docker compose up -d postgres redis
 npm install
 npm run setup               # create tables (idempotent)
 npm start                   # API on :3000        (terminal 1)
@@ -167,12 +158,15 @@ src/
     db.js                   PostgreSQL connection pool (single shared instance)
     redis.js                Redis client (single shared instance)
     base62.js               Base62 encode/decode for short codes
+    metrics.js              Prometheus registry: request counter + latency histogram
 db/
   schema.sql                Table definitions
 scripts/
   setup.js                  Creates the tables from db/schema.sql (idempotent)
   seed.js                   Batched 100k-row seeder (with sequence re-sync)
-docker-compose.yml          PostgreSQL + Redis services
+docker-compose.yml          Full stack: postgres · redis · api · gateway · worker · prometheus · grafana
+nginx.conf                  Gateway: reverse proxy + limit_req in front of the API replicas
+prometheus.yml              Scrape config (all API replicas via DNS discovery)
 k6/                         Load-test scripts
 ```
 
@@ -184,6 +178,8 @@ repositories return plain data (or `null` — the route decides the `404`).
 
 - [ ] Finish p95 tuning pass (pool sizing, worker isolation)
 - [ ] `shorten` load test + rate-limit correctness test under concurrency
-- [ ] Redis cache for hot links on the redirect path
+- [x] Redis cache for hot links on the redirect path
+- [ ] Kafka click pipeline v2 (behind a feature switch)
+- [ ] Kubernetes deployment
 - [ ] Custom aliases and link expiry
 - [ ] Minimal frontend (shorten form + stats view)
