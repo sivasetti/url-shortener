@@ -33,10 +33,12 @@ async function getUrlStats(code) {
 
 async function resolveUrl(code) {
     const cacheKey = `url:${code}`;
+    const clickedAt = new Date().toISOString();
+
     try{
         const cached = await redis.get(cacheKey);
         if(cached){
-            await clickQueue.add('click', {code});
+            await clickQueue.add('click', {code, clickedAt});
             return cached;
         }
     }
@@ -57,7 +59,7 @@ async function resolveUrl(code) {
         console.error(`Cache: could not save url, continuing - `, err.message);
     }
 
-    await clickQueue.add('click', {code});
+    await clickQueue.add('click', {code, clickedAt});
 
     return url.long_url;
 }
