@@ -3,7 +3,8 @@ const app = express();
 
 const urlsRouter = require('./routes/urls');
 const redirectRouter = require('./routes/redirect');
-const {metricsMiddleware, metricsHandler} = require('./lib/metrics')
+const {metricsMiddleware, metricsHandler} = require('./lib/metrics');
+const errorHandler = require('./middleware/errorHandler');
 
 app.use(express.json());
 app.use(metricsMiddleware);
@@ -28,6 +29,7 @@ app.get('/health', (req, res)=>{
 
 app.use(urlsRouter);
 app.use(redirectRouter);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, ()=>{
