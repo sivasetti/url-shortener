@@ -5,11 +5,13 @@ const clickQueue = require('../queues/clickQueue');
 const redis = require('../lib/redis');
 
 async function shortenUrl(longUrl) {
-    const created = await urlRepository.createUrl(longUrl);
+    return pool.withTransaction(async (client) => {
+    const created = await urlRepository.createUrl(longUrl, client);
     const code = encode(created.id);
-    await urlRepository.setShortCode(created.id, code);
+    await urlRepository.setShortCode(created.id, code, client);
 
     return code;
+    });
 }
 
 async function getUrlStats(code) {

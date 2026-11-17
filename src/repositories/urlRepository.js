@@ -9,8 +9,8 @@ async function findByShortCode(code) {
 }
 
 
-async function createUrl(longUrl) {
-    const result = await pool.query(
+async function createUrl(longUrl, db = pool) {
+    const result = await db.query(
         `INSERT INTO urls(long_url) VALUES ($1) RETURNING id`, [longUrl]
     );
 
@@ -18,8 +18,8 @@ async function createUrl(longUrl) {
 }
 
 
-async function setShortCode(id, shortCode) {
-    await pool.query(
+async function setShortCode(id, shortCode, db = pool) {
+    await db.query(
         `UPDATE urls SET short_code = $1 WHERE id = $2`, [shortCode, id]
     )
 }
@@ -36,8 +36,8 @@ async function findStatsByShortCode(code) {
     return result.rows[0] || null;
 }
 
-async function incrementClickCount(code) {
-    await pool.query(
+async function incrementClickCount(code, db = pool) {
+    await db.query(
         `UPDATE urls SET click_count = click_count+1 WHERE short_code = $1`, [code]
     );
 }
