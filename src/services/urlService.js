@@ -2,6 +2,7 @@ const {encode} = require('../lib/base62');
 const urlRepository = require('../repositories/urlRepository');
 const clickRepository = require('../repositories/clickRepository');
 const clickQueue = require('../queues/clickQueue');
+const pool = require('../lib/db');
 const redis = require('../lib/redis');
 
 async function shortenUrl(longUrl) {
