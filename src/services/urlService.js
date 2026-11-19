@@ -4,6 +4,8 @@ const clickRepository = require('../repositories/clickRepository');
 const clickQueue = require('../queues/clickQueue');
 const pool = require('../lib/db');
 const redis = require('../lib/redis');
+const {randomUUID}  = require('node:crypto');
+
 
 async function shortenUrl(longUrl) {
     return pool.withTransaction(async (client) => {
@@ -37,11 +39,11 @@ async function getUrlStats(code) {
 async function resolveUrl(code) {
     const cacheKey = `url:${code}`;
     const clickedAt = new Date().toISOString();
-
+    const eventId = randomUUID();
     try{
         const cached = await redis.get(cacheKey);
         if(cached){
-            await clickQueue.add('click', {code, clickedAt});
+            await clickQueue.add('click', {code, clickedAt, eventId});
             return cached;
         }
     }
@@ -62,7 +64,7 @@ async function resolveUrl(code) {
         console.error(`Cache: could not save url, continuing - `, err.message);
     }
 
-    await clickQueue.add('click', {code, clickedAt});
+    await clickQueue.add('click', {code, clickedAt, eventId});
 
     return url.long_url;
 }

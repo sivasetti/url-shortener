@@ -10,7 +10,9 @@ CREATE TABLE IF NOT EXISTS clicks(
         id BIGSERIAL PRIMARY KEY,
         short_code VARCHAR(10) NOT NULL,
         clicked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        event_id TEXT,
         referrer TEXT);
 
-
 CREATE INDEX IF NOT EXISTS idx_clicks_code_time ON clicks(short_code, clicked_at);
+ALTER TABLE clicks ADD COLUMN IF NOT EXISTS event_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clicks_event_id ON clicks(event_id);

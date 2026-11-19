@@ -12,9 +12,11 @@ async function findClicksByDay(code) {
     return result.rows;
 }
 
-async function recordClick(code, clickedAt, db = pool) {
-    await db.query(
-        `INSERT INTO clicks (short_code, clicked_at) VALUES ($1, $2)`, [code, clickedAt]);
+async function recordClick(code, clickedAt, eventId, db = pool) {
+    const result = await db.query(
+        `INSERT INTO clicks (short_code, clicked_at, event_id) VALUES ($1, $2, $3) 
+        ON CONFLICT (event_id) DO NOTHING RETURNING id`, [code, clickedAt, eventId || null]);
+    return result.rows.length > 0;
 }
 
     

@@ -3,9 +3,9 @@ const clickService = require('../services/clickService');
 const redisUrl = new URL(process.env.REDIS_URL || 'redis://localhost:6379');
 
 const worker = new Worker('clicks', async (job) => {
-    const {code, clickedAt} = job.data;
+    const {code, clickedAt, eventId} = job.data;
 
-    await clickService.recordClick(code, clickedAt);
+    await clickService.recordClick(code, clickedAt, eventId);
 
     console.log('Counted a click for', code);
 }, 
