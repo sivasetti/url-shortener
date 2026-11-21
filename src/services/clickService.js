@@ -13,5 +13,5 @@ async function recordClick(code, clickedAt, eventId) {
 
 
 module.exports = {
-    recordClick
+    recordClick,
 }
