@@ -183,3 +183,5 @@ repositories return plain data (or `null` — the route decides the `404`).
 - [ ] Kubernetes deployment
 - [ ] Custom aliases and link expiry
 - [ ] Minimal frontend (shorten form + stats view)
+
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/sivasetti/url-shortener?utm_source=readme&utm_medium=badge)
